@@ -43,6 +43,13 @@ jobs:
           ndk-version: r26b
           add-to-path: true
 
+      - name: Configure Android linker
+        if: contains(matrix.target, 'android')
+        run: |
+          echo "[target.aarch64-linux-android]" >> .cargo/config.toml
+          echo "ar = \"${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-ar\"" >> .cargo/config.toml
+          echo "linker = \"${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang\"" >> .cargo/config.toml
+
       - name: Cache Cargo registry + build
         uses: actions/cache@v4
         with:

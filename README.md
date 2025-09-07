@@ -1,6 +1,8 @@
 # Rust
 Using rust to build for mac, linux and windows in gitpod
 
+Good, self sign all os like windows, ios, linux, macos, android and wasm
+
 <!-- ```rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env

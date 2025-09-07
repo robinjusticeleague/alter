@@ -1,4 +1,4 @@
-# Old build.yml
+# New build.yml
 
 ```yml
 name: Alter
@@ -11,15 +11,24 @@ on:
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Build on ${{ matrix.os }} for ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-latest
+            target: wasm32-unknown-unknown
+          - os: ubuntu-latest
+            target: aarch64-linux-android
+          - os: macos-latest
+            target: aarch64-apple-ios
 
     steps:
       - name: Checkout repository
@@ -27,6 +36,23 @@ jobs:
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Android NDK
+        if: contains(matrix.target, 'android')
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+          add-to-path: true
+
+      - name: Configure Android linker
+        if: contains(matrix.target, 'android')
+        run: |
+          mkdir -p .cargo
+          echo "[target.aarch64-linux-android]" >> .cargo/config.toml
+          echo "ar = \"${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android-ar\"" >> .cargo/config.toml
+          echo "linker = \"${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang\"" >> .cargo/config.toml
 
       - name: Cache Cargo registry + build
         uses: actions/cache@v4
@@ -35,19 +61,87 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Verify lockfile is up to date
-        run: cargo check --locked
+        run: cargo check --locked --target ${{ matrix.target }}
 
       - name: Build release
-        run: cargo build --release --locked
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Ensure WASM file exists
+        if: contains(matrix.target, 'wasm')
+        run: |
+          mkdir -p target/${{ matrix.target }}/release
+          if [ ! -f target/${{ matrix.target }}/release/alter.wasm ]; then
+            cp target/${{ matrix.target }}/release/alter target/${{ matrix.target }}/release/alter.wasm || true
+          fi
+
+      - name: Add signtool to PATH (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: KamaranL/add-signtool-action@v1
+
+      - name: Self-sign Windows binary
+        if: startsWith(matrix.os, 'windows') && hashFiles(format('target/{0}/release/alter.exe', matrix.target)) != ''
+        run: |
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Alter Dev" -CertStoreLocation Cert:\CurrentUser\My
+          $pwd = ConvertTo-SecureString -String "password" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
+          Export-Certificate -Cert $cert -FilePath alter-public.cer
+          signtool sign /fd SHA256 /f cert.pfx /p password target\${{ matrix.target }}\release\alter.exe
+
+      - name: Self-sign macOS/iOS binary
+        if: startsWith(matrix.os, 'macos') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''
+        run: |
+          CERT_PATH=dev-cert.pem
+          KEY_PATH=dev-key.pem
+          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+            -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
+          openssl pkcs12 -export -out dev-cert.p12 \
+            -inkey $KEY_PATH -in $CERT_PATH -passout pass:
+          security create-keychain -p "" build.keychain
+          security import dev-cert.p12 -k build.keychain -P "" -T /usr/bin/codesign
+          security list-keychains -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          cp $CERT_PATH alter-public.pem
+          codesign --force --sign "Alter Dev" --keychain build.keychain \
+            target/${{ matrix.target }}/release/alter
+
+      - name: Self-sign Linux binary
+        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, 'android') && !contains(matrix.target, 'wasm') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''
+        run: |
+          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout dev-key.pem -out dev-cert.pem
+          cp dev-cert.pem alter-public.pem
+          openssl dgst -sha256 -sign dev-key.pem -out alter.sig target/${{ matrix.target }}/release/alter
+
+      - name: Self-sign Android APK
+        if: contains(matrix.target, 'android') && hashFiles('**/*.apk') != ''
+        run: |
+          keytool -genkeypair -v -keystore dev.keystore -storepass password -keypass password -alias alter -keyalg RSA -keysize 2048 -validity 365 -dname "CN=Alter Dev"
+          keytool -export -alias alter -keystore dev.keystore -storepass password -file alter-public.cer
+          jarsigner -keystore dev.keystore -storepass password $(find . -name "*.apk" | head -n 1) alter
+
+      - name: Self-sign WASM binary
+        if: contains(matrix.target, 'wasm') && hashFiles(format('target/{0}/release/alter.wasm', matrix.target)) != ''
+        run: |
+          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout dev-key.pem -out dev-cert.pem
+          cp dev-cert.pem alter-public.pem
+          openssl dgst -sha256 -sign dev-key.pem -out alter.wasm.sig target/${{ matrix.target }}/release/alter.wasm
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: alter-${{ matrix.os }}
-          path: target/release/alter${{ runner.os == 'Windows' && '.exe' || '' }}
+          name: alter-${{ matrix.os }}-${{ matrix.target }}
+          path: |
+            ${{ startsWith(matrix.os, 'windows') && format('target/{0}/release/alter.exe', matrix.target) || format('target/{0}/release/alter*', matrix.target) }}
+
+      - name: Upload public certificate
+        if: hashFiles('alter-public.*') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: alter-public-cert-${{ matrix.os }}-${{ matrix.target }}
+          path: alter-public.*
+
 ```

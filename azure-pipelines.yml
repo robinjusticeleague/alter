@@ -3,59 +3,35 @@ trigger:
     include:
       - main
 
-stages:
-  - stage: Build
-    jobs:
-      - job: Linux
-        pool:
-          vmImage: ubuntu-latest
-        steps:
-          - checkout: self
-          - script: rustup update stable && rustup default stable
-          - task: Cache@2
-            inputs:
-              key: 'linux-cargo-$(Build.SourcesDirectory)/Cargo.lock'
-              path: |
-                ~/.cargo/registry
-                ~/.cargo/git
-                target
-          - script: cargo check --locked
-          - script: cargo build --release --locked
-          - publish: target/release
-            artifact: forge-linux
+pool:
+  vmImage: ubuntu-latest
 
-      - job: macOS
-        pool:
-          vmImage: macos-latest
-        steps:
-          - checkout: self
-          - script: rustup update stable && rustup default stable
-          - task: Cache@2
-            inputs:
-              key: 'macos-cargo-$(Build.SourcesDirectory)/Cargo.lock'
-              path: |
-                ~/.cargo/registry
-                ~/.cargo/git
-                target
-          - script: cargo check --locked
-          - script: cargo build --release --locked
-          - publish: target/release
-            artifact: forge-macos
+steps:
+  - checkout: self
 
-      - job: Windows
-        pool:
-          vmImage: windows-2022
-        steps:
-          - checkout: self
-          - powershell: rustup update stable; rustup default stable
-          - task: Cache@2
-            inputs:
-              key: 'windows-cargo-$(Build.SourcesDirectory)/Cargo.lock'
-              path: |
-                C:\Users\VssAdministrator\.cargo\registry
-                C:\Users\VssAdministrator\.cargo\git
-                target
-          - powershell: cargo check --locked
-          - powershell: cargo build --release --locked
-          - publish: target/release
-            artifact: forge-windows
+  - script: rustup update stable && rustup default stable
+
+  - task: Cache@2
+    inputs:
+      key: 'linux-cargo-$(Build.SourcesDirectory)/Cargo.lock'
+      path: |
+        ~/.cargo/registry
+        ~/.cargo/git
+        target
+
+  - script: cargo check --locked
+  - script: cargo build --release --locked
+  - publish: target/release
+    artifact: forge-linux
+
+  - script: sudo apt-get update && sudo apt-get install -y qemu qemu-user-static
+
+  - script: rustup target add x86_64-apple-darwin
+  - script: cargo build --release --locked --target x86_64-apple-darwin
+  - publish: target/x86_64-apple-darwin/release
+    artifact: forge-macos
+
+  - script: rustup target add x86_64-pc-windows-gnu
+  - script: cargo build --release --locked --target x86_64-pc-windows-gnu
+  - publish: target/x86_64-pc-windows-gnu/release
+    artifact: forge-windows

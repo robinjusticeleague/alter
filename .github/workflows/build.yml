@@ -1,4 +1,4 @@
-name: Build alter
+name: Alter
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          - windows-2022
+          - windows-latest
 
     steps:
       - name: Checkout repository

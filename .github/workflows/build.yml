@@ -13,7 +13,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - ubuntu-latest   # Linux (Ubuntu)
+          - macos-latest    # macOS
+          - windows-2025    # Windows (pinned to avoid migration surprise)
 
     steps:
       - name: Checkout repository
@@ -33,7 +36,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # Fast fail if Cargo.lock is out of date
       - name: Verify lockfile is up to date
         run: cargo check --locked
 

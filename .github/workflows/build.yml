@@ -10,8 +10,8 @@ jobs:
   build:
     strategy:
       matrix:
-        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu, x86_64-apple-darwin, aarch64-apple-darwin]
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        target: [x86_64-unknown-linux-gnu, x86_64-pc-windows-gnu, x86_64-apple-darwin, aarch64-apple-darwin, aarch64-linux-android, aarch64-apple-ios]
+        os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-latest, macos-latest]
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
@@ -21,6 +21,10 @@ jobs:
             os: macos-latest
           - target: aarch64-apple-darwin
             os: macos-latest
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+          - target: aarch64-apple-ios
+            os: macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +32,24 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - name: Install MinGW (Windows)
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          choco install mingw -y
+          refreshenv
+      - name: Configure Cargo for Windows
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: |
+          mkdir .cargo
+          echo '[target.x86_64-pc-windows-gnu]' > .cargo/config.toml
+          echo 'linker = "x86_64-w64-mingw32-gcc"' >> .cargo/config.toml
+          echo 'ar = "x86_64-w64-mingw32-ar"' >> .cargo/config.toml
+      - name: Install Android NDK
+        if: matrix.target == 'aarch64-linux-android'
+        run: |
+          wget https://dl.google.com/android/repository/android-ndk-r23b-linux-x86_64.zip
+          unzip android-ndk-r23b-linux-x86_64.zip -d $HOME
+          echo "ANDROID_NDK_HOME=$HOME/android-ndk-r23b" >> $GITHUB_ENV
       - name: Optimize Cargo
         run: |
           echo '[profile.release]' >> Cargo.toml

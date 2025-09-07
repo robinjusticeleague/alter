@@ -3,6 +3,8 @@ Using rust to build for mac, linux and windows in gitpod
 
 Good, now I am using it in my windows pc but I am getting nothing when clicking doulble time in file explorer of alter.exe
 
+Study zed github repo and give me summary of the code of how it builds the editor for linux and mac what github actions yml is being used here
+
 <!-- ```rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env

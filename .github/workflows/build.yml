@@ -76,6 +76,10 @@ jobs:
             cp target/${{ matrix.target }}/release/alter target/${{ matrix.target }}/release/alter.wasm || true
           fi
 
+      - name: Add signtool to PATH (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: KamaranL/add-signtool-action@v1
+
       - name: Self-sign Windows binary
         if: startsWith(matrix.os, 'windows') && hashFiles(format('target/{0}/release/alter.exe', matrix.target)) != ''
         run: |
@@ -83,7 +87,7 @@ jobs:
           $pwd = ConvertTo-SecureString -String "password" -Force -AsPlainText
           Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
           Export-Certificate -Cert $cert -FilePath alter-public.cer
-          & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /f cert.pfx /p password target\${{ matrix.target }}\release\alter.exe
+          signtool sign /fd SHA256 /f cert.pfx /p password target\${{ matrix.target }}\release\alter.exe
 
       - name: Self-sign macOS/iOS binary
         if: startsWith(matrix.os, 'macos') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''
@@ -91,8 +95,9 @@ jobs:
           CERT_PATH=dev-cert.pem
           KEY_PATH=dev-key.pem
           openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
+          openssl pkcs12 -export -out dev-cert.p12 -inkey $KEY_PATH -in $CERT_PATH -passout pass:
           security create-keychain -p "" build.keychain
-          security import $CERT_PATH -k build.keychain -A
+          security import dev-cert.p12 -k build.keychain -P "" -T /usr/bin/codesign
           security list-keychains -s build.keychain
           security unlock-keychain -p "" build.keychain
           cp $CERT_PATH alter-public.pem

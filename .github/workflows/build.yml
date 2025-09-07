@@ -34,12 +34,14 @@ jobs:
           targets: ${{ matrix.target }}
       - name: Install Chocolatey (Windows)
         if: matrix.target == 'x86_64-pc-windows-gnu'
+        shell: powershell
         run: |
           Set-ExecutionPolicy Bypass -Scope Process -Force
           [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
           iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
       - name: Install MinGW (Windows)
         if: matrix.target == 'x86_64-pc-windows-gnu'
+        shell: powershell
         run: |
           choco install mingw -y
           refreshenv

@@ -4,9 +4,3 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
-
-[profile.release]
-opt-level = "z"
-strip = true
-lto = true
-codegen-units = 1

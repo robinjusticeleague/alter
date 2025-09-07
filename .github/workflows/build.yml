@@ -3,8 +3,8 @@ name: Build Forge
 on:
   push:
     branches:
-      - "**" # every branch, every push
-  workflow_dispatch: # allow manual runs too
+      - "**"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,12 +19,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          profile: minimal
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Cache Cargo registry + build
         uses: actions/cache@v4
@@ -38,7 +34,7 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

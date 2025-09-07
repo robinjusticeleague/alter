@@ -1,0 +1,52 @@
+# Old build.yml
+```yml
+name: Alter
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Verify lockfile is up to date
+        run: cargo check --locked
+
+      - name: Build release
+        run: cargo build --release --locked
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: alter-${{ matrix.os }}
+          path: target/release/alter${{ runner.os == 'Windows' && '.exe' || '' }}
+```

@@ -96,7 +96,7 @@ jobs:
           KEY_PATH=dev-key.pem
           openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
             -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
-          openssl pkcs12 -export -legacy -out dev-cert.p12 \
+          openssl pkcs12 -export -out dev-cert.p12 \
             -inkey $KEY_PATH -in $CERT_PATH -passout pass:
           security create-keychain -p "" build.keychain
           security import dev-cert.p12 -k build.keychain -P "" -T /usr/bin/codesign

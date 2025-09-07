@@ -14,9 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-latest   # Linux (Ubuntu)
-          - macos-latest    # macOS
-          - windows-2025    # Windows (pinned to avoid migration surprise)
+          - ubuntu-latest
+          - macos-latest
+          - windows-2025
 
     steps:
       - name: Checkout repository

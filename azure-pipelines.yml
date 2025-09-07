@@ -1,78 +1,61 @@
 trigger:
-  - main
+  branches:
+    include:
+      - "*"
 
-jobs:
-  - job: Build
-    strategy:
-      matrix:
-        Linux:
+stages:
+  - stage: Build
+    jobs:
+      - job: Linux
+        pool:
           vmImage: ubuntu-latest
-          target: x86_64-unknown-linux-gnu
-        Windows:
-          vmImage: windows-latest
-          target: x86_64-pc-windows-gnu
-        macOS_x86_64:
+        steps:
+          - checkout: self
+          - script: rustup update stable && rustup default stable
+          - task: Cache@2
+            inputs:
+              key: 'linux-cargo-$(Build.SourcesDirectory)/Cargo.lock'
+              path: |
+                ~/.cargo/registry
+                ~/.cargo/git
+                target
+          - script: cargo check --locked
+          - script: cargo build --release --locked
+          - publish: target/release
+            artifact: forge-linux
+
+      - job: macOS
+        pool:
           vmImage: macos-latest
-          target: x86_64-apple-darwin
-        macOS_aarch64:
-          vmImage: macos-latest
-          target: aarch64-apple-darwin
-        Android:
-          vmImage: ubuntu-latest
-          target: aarch64-linux-android
-        iOS:
-          vmImage: macos-latest
-          target: aarch64-apple-ios
-    pool:
-      vmImage: $(vmImage)
-    steps:
-      - checkout: self
-      - script: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source $HOME/.cargo/env
-          rustup target add $(target)
-        displayName: Install Rust
-        condition: ne(variables['vmImage'], 'windows-latest')
-      - powershell: |
-          Set-ExecutionPolicy Bypass -Scope Process -Force
-          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-          choco install rust -y
-          choco install mingw -y
-          refreshenv
-          rustup target add $(target)
-        displayName: Install Rust and MinGW (Windows)
-        condition: eq(variables['vmImage'], 'windows-latest')
-      - script: |
-          sudo apt-get update
-          sudo apt-get install -y unzip
-          wget https://dl.google.com/android/repository/android-ndk-r23b-linux-x86_64.zip
-          unzip android-ndk-r23b-linux-x86_64.zip -d $HOME
-          echo "ANDROID_NDK_HOME=$HOME/android-ndk-r23b" >> $GITHUB_ENV
-        displayName: Install Android NDK
-        condition: eq(variables['target'], 'aarch64-linux-android')
-      - script: |
-          echo '[profile.release]' >> Cargo.toml
-          echo 'opt-level = "z"' >> Cargo.toml
-          echo 'strip = true' >> Cargo.toml
-          echo 'lto = true' >> Cargo.toml
-          echo 'codegen-units = 1' >> Cargo.toml
-        displayName: Optimize Cargo
-      - script: |
-          echo '[target.x86_64-pc-windows-gnu]' > .cargo/config.toml
-          echo 'linker = "x86_64-w64-mingw32-gcc"' >> .cargo/config.toml
-          echo 'ar = "x86_64-w64-mingw32-ar"' >> .cargo/config.toml
-        displayName: Configure Cargo for Windows
-        condition: eq(variables['target'], 'x86_64-pc-windows-gnu')
-      - script: |
-          source $HOME/.cargo/env
-          cargo build --release --target $(target)
-        displayName: Build
-        condition: ne(variables['vmImage'], 'windows-latest')
-      - powershell: |
-          cargo build --release --target $(target)
-        displayName: Build (Windows)
-        condition: eq(variables['vmImage'], 'windows-latest')
-      - publish: target/$(target)/release
-        artifact: rust-$(target)
-        displayName: Publish Artifacts
+        steps:
+          - checkout: self
+          - script: rustup update stable && rustup default stable
+          - task: Cache@2
+            inputs:
+              key: 'macos-cargo-$(Build.SourcesDirectory)/Cargo.lock'
+              path: |
+                ~/.cargo/registry
+                ~/.cargo/git
+                target
+          - script: cargo check --locked
+          - script: cargo build --release --locked
+          - publish: target/release
+            artifact: forge-macos
+
+      - job: Windows
+        pool:
+          vmImage: windows-2022
+        steps:
+          - checkout: self
+          - powershell: rustup update stable; rustup default stable
+          - task: Cache@2
+            inputs:
+              key: 'windows-cargo-$(Build.SourcesDirectory)/Cargo.lock'
+              path: |
+                C:\Users\VssAdministrator\.cargo\registry
+                C:\Users\VssAdministrator\.cargo\git
+                target
+          - powershell: cargo check --locked
+          - powershell: cargo build --release --locked
+          - publish: target/release
+            artifact: forge-windows

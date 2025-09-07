@@ -16,7 +16,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-          - windows-2025
+          - windows-latest
 
     steps:
       - name: Checkout repository

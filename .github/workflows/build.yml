@@ -94,14 +94,17 @@ jobs:
         run: |
           CERT_PATH=dev-cert.pem
           KEY_PATH=dev-key.pem
-          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
-          openssl pkcs12 -export -out dev-cert.p12 -inkey $KEY_PATH -in $CERT_PATH -passout pass:
+          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+            -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
+          openssl pkcs12 -export -legacy -out dev-cert.p12 \
+            -inkey $KEY_PATH -in $CERT_PATH -passout pass:
           security create-keychain -p "" build.keychain
           security import dev-cert.p12 -k build.keychain -P "" -T /usr/bin/codesign
           security list-keychains -s build.keychain
           security unlock-keychain -p "" build.keychain
           cp $CERT_PATH alter-public.pem
-          codesign --force --sign "Alter Dev" --keychain build.keychain target/${{ matrix.target }}/release/alter
+          codesign --force --sign "Alter Dev" --keychain build.keychain \
+            target/${{ matrix.target }}/release/alter
 
       - name: Self-sign Linux binary
         if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, 'android') && !contains(matrix.target, 'wasm') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''

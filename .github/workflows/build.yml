@@ -77,40 +77,43 @@ jobs:
           fi
 
       - name: Self-sign Windows binary
-        if: startsWith(matrix.os, 'windows')
+        if: startsWith(matrix.os, 'windows') && hashFiles(format('target/{0}/release/alter.exe', matrix.target)) != ''
         run: |
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=Alter Dev" -CertStoreLocation Cert:\CurrentUser\My
           $pwd = ConvertTo-SecureString -String "password" -Force -AsPlainText
           Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
           Export-Certificate -Cert $cert -FilePath alter-public.cer
-          signtool sign /fd SHA256 /f cert.pfx /p password target\${{ matrix.target }}\release\alter.exe
+          & "C:\Program Files (x86)\Windows Kits\10\bin\x64\signtool.exe" sign /fd SHA256 /f cert.pfx /p password target\${{ matrix.target }}\release\alter.exe
 
       - name: Self-sign macOS/iOS binary
-        if: startsWith(matrix.os, 'macos')
+        if: startsWith(matrix.os, 'macos') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''
         run: |
           CERT_PATH=dev-cert.pem
           KEY_PATH=dev-key.pem
           openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout $KEY_PATH -out $CERT_PATH
-          security import $CERT_PATH -k ~/Library/Keychains/login.keychain-db -A
+          security create-keychain -p "" build.keychain
+          security import $CERT_PATH -k build.keychain -A
+          security list-keychains -s build.keychain
+          security unlock-keychain -p "" build.keychain
           cp $CERT_PATH alter-public.pem
-          codesign --force --sign "Alter Dev" target/${{ matrix.target }}/release/alter
+          codesign --force --sign "Alter Dev" --keychain build.keychain target/${{ matrix.target }}/release/alter
 
       - name: Self-sign Linux binary
-        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, 'android') && !contains(matrix.target, 'wasm')
+        if: startsWith(matrix.os, 'ubuntu') && !contains(matrix.target, 'android') && !contains(matrix.target, 'wasm') && hashFiles(format('target/{0}/release/alter', matrix.target)) != ''
         run: |
           openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout dev-key.pem -out dev-cert.pem
           cp dev-cert.pem alter-public.pem
           openssl dgst -sha256 -sign dev-key.pem -out alter.sig target/${{ matrix.target }}/release/alter
 
-      - name: Self-sign Android binary
-        if: contains(matrix.target, 'android')
+      - name: Self-sign Android APK
+        if: contains(matrix.target, 'android') && hashFiles('**/*.apk') != ''
         run: |
           keytool -genkeypair -v -keystore dev.keystore -storepass password -keypass password -alias alter -keyalg RSA -keysize 2048 -validity 365 -dname "CN=Alter Dev"
           keytool -export -alias alter -keystore dev.keystore -storepass password -file alter-public.cer
-          jarsigner -keystore dev.keystore -storepass password target/${{ matrix.target }}/release/alter alter
+          jarsigner -keystore dev.keystore -storepass password $(find . -name "*.apk" | head -n 1) alter
 
       - name: Self-sign WASM binary
-        if: contains(matrix.target, 'wasm')
+        if: contains(matrix.target, 'wasm') && hashFiles(format('target/{0}/release/alter.wasm', matrix.target)) != ''
         run: |
           openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -subj "/CN=Alter Dev" -keyout dev-key.pem -out dev-cert.pem
           cp dev-cert.pem alter-public.pem

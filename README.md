@@ -1,7 +1,7 @@
 # Rust
 Using rust to build for mac, linux and windows in gitpod
 
-Good, self sign all os like windows, ios, linux, macos, android and wasm
+Good, now I am using it in my windows pc but I am getting nothing when clicking doulble time in file explorer of alter.exe
 
 <!-- ```rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y

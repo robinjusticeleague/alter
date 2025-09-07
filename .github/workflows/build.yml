@@ -1,4 +1,4 @@
-name: Build Forge
+name: Build alter
 
 on:
   push:
@@ -45,5 +45,5 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: forge-${{ matrix.os }}
-          path: target/release/forge${{ runner.os == 'Windows' && '.exe' || '' }}
+          name: alter-${{ matrix.os }}
+          path: target/release/alter${{ runner.os == 'Windows' && '.exe' || '' }}

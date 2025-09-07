@@ -33,6 +33,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      # Fast fail if Cargo.lock is out of date
+      - name: Verify lockfile is up to date
+        run: cargo check --locked
+
       - name: Build release
         run: cargo build --release --locked
 
